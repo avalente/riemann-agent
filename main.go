@@ -19,6 +19,8 @@ const LOGGING_MODULE = "riemann-agent"
 
 var log = logging.MustGetLogger(LOGGING_MODULE)
 
+var logFile *os.File
+
 type ResQueue chan *raidman.Event
 
 type CmdlineArgs struct {
@@ -47,6 +49,10 @@ func parseCmdline() CmdlineArgs {
 }
 
 func initializeLogging(fileName string, stringLevel string) {
+	if logFile != nil {
+		logFile.Close()
+	}
+
 	if fileName == "" {
 		return
 	}
@@ -58,7 +64,7 @@ func initializeLogging(fileName string, stringLevel string) {
 
 	consoleLogging := func() {
 		formatter := logging.MustStringFormatter(
-			"%{color}[%{time:2006-01-02 15:04:05.000}] %{module} %{shortfile} ▶ %{level:.7s}%{color:reset} %{message}",
+			"%{color}[%{time:2006-01-02 15:04:05.000}] %{module} %{shortfile} ▶ %{level:-7.7s}%{color:reset} %{message}",
 		)
 		logging.SetFormatter(formatter)
 
@@ -73,14 +79,15 @@ func initializeLogging(fileName string, stringLevel string) {
 	if fileName == "-" {
 		consoleLogging()
 	} else {
-		file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
-		defer file.Close()
+		file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			consoleLogging()
 			log.Error("%v", err)
 		} else {
+			logFile = file
+
 			formatter := logging.MustStringFormatter(
-				"[%{time:15:04:05.000}] %{level:.7s} %{module} %{message}",
+				"[%{time:2006-01-02 15:04:05.000}] %{level:-7.7s} %{module} %{message}",
 			)
 			logging.SetFormatter(formatter)
 
@@ -141,6 +148,9 @@ func main() {
 	StopAll(&state)
 	if state.configuration.PidFile != "" {
 		os.Remove(state.configuration.PidFile)
+	}
+	if logFile != nil {
+		logFile.Close()
 	}
 }
 
