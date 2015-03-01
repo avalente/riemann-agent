@@ -1,0 +1,7 @@
+{
+  "name": "test",
+  "kind": "executable",
+  "parameters": [
+    {"name": "test_value", "type": "number", "required": true, "default": 42}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Test driver",
+  "module": "test",
+  "interval": 20,
+  "service": "python %tag",
+  "configuration": {
+    "test_value": 10
+  }
+}

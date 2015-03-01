@@ -1,0 +1,6 @@
+{
+  "riemannprotocol": "tcp",
+  "logfile": "agent.log",
+  "loglevel": "info",
+  "pidfile": "agent.pid"
+}

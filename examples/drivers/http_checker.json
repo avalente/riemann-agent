@@ -1,0 +1,17 @@
+{
+  "description": "HTTP test driver",
+  "module": "http",
+  "service": "http application",
+  "ttl": 120,
+  "tags": ["http", "service"],
+  "interval": 10,
+  "configuration": {
+    "url": "https://google.com",
+    "headers": {
+      "User-Agent": "riemann-agent"
+    },
+    "method": "GET",
+    "timeout": 2,
+    "include_response": false
+  }
+}

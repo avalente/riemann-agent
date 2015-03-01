@@ -1,0 +1,32 @@
+#!/usr/bin/python
+
+"""
+This is an example of custom module
+The "loop" function implements the protocol between riemann-agent
+and the custom module, while "fun" generates the events
+"""
+
+import struct
+import sys
+import json
+
+def loop(fun):
+    while True:
+        msg = sys.stdin.readline().strip()
+        if not msg or msg == "exit":
+            break
+        if msg.startswith("call "):
+            in_ = json.loads(msg[5:])
+            data = fun(in_)
+            count = struct.pack("<I", len(data))
+            for item in data:
+                out = json.dumps(item)
+                size = struct.pack("<I", len(out))
+                sys.stdout.write("%s%s%s" % (count, size, out))
+            sys.stdout.flush()
+
+def fun(in_):
+    return [dict(metric=4.2, attributes={"input": str(in_)}, service="from python")]
+
+if __name__ == "__main__":
+    loop(fun)
