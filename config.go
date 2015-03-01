@@ -18,7 +18,7 @@ type Configuration struct {
 }
 
 func NewConfiguration() *Configuration {
-	return &Configuration{"modules", "drivers", "localhost:5555", "udp", "-", "info", ""}
+	return &Configuration{"custom-modules", "drivers", "localhost:5555", "udp", "-", "info", ""}
 }
 
 func getConfiguration(fileName string) (*Configuration, error) {

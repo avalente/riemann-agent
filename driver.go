@@ -1,13 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/amir/raidman"
 
 	"github.com/avalente/riemann-agent/modules"
 )
@@ -112,6 +117,109 @@ func GetParameters(drv Driver) (modules.ModuleParamList, string) {
 }
 
 func RunDriver(drv Driver, doneChan chan bool, queue ResQueue) {
+	switch drv.ModuleObject.Kind {
+	case "builtin":
+		RunBuiltin(&drv, &doneChan, &queue)
+	case "executable":
+		RunExecutable(&drv, &doneChan, &queue)
+	}
+}
+
+func RunExecutable(pdrv *Driver, pdoneChan *chan bool, pqueue *ResQueue) {
+	drv := *pdrv
+	doneChan := *pdoneChan
+	queue := *pqueue
+
+	paramsMap, err := GetParameters(drv)
+	if err != "" {
+		log.Error("Can't run driver %s: %s - DRIVER DISABLED", drv.Id, err)
+		<-doneChan
+	} else {
+		paramsJson, _ := json.Marshal(paramsMap)
+
+		duration := time.Duration(drv.Interval) * time.Second
+
+		ticker := time.NewTicker(duration)
+
+		exit := false
+
+		// start external process
+		cmd := exec.Command(drv.ModuleObject.Executable)
+		stdin, err_stdin := cmd.StdinPipe()
+		stdout, err_stdout := cmd.StdoutPipe()
+
+		switch {
+		case err_stdin != nil:
+			log.Error("Can't run driver %s on custom module %s: can't get stdin (%v) - DRIVER DISABLED", drv.Id, drv.Module, err_stdin)
+			<-doneChan
+
+		case err_stdout != nil:
+			log.Error("Can't run driver %s on custom module %s: can't get stdout (%v) - DRIVER DISABLED", drv.Id, drv.Module, err_stdout)
+			<-doneChan
+		}
+
+		err := cmd.Start()
+		if err != nil {
+			log.Error("Can't run driver %s on custom module %s: %s - DRIVER DISABLED", drv.Id, drv.Module, err)
+			<-doneChan
+		} else {
+
+			for !exit {
+				select {
+				case <-doneChan:
+					log.Debug("Terminating driver %v", drv.Id)
+					ticker.Stop()
+					stdin.Write([]byte("exit"))
+					cmd.Wait()
+					exit = true
+				case <-ticker.C:
+					//TODO: check errors
+					in_ := append([]byte("call "), paramsJson...)
+					in_ = append(in_, '\n')
+					stdin.Write(in_)
+
+					// events count
+					var count int32
+					binary.Read(stdout, binary.LittleEndian, &count)
+
+					for i := 0; i < int(count); i++ {
+						var size int32
+						binary.Read(stdout, binary.LittleEndian, &size)
+						buf := make([]byte, size)
+						n, _ := stdout.Read(buf)
+						if n != int(size) {
+							//TODO: check n
+						}
+
+						ev := raidman.Event{}
+						ev.Description = drv.Description
+						ev.Host = drv.Host
+						ev.Tags = drv.Tags
+						ev.Ttl = drv.Ttl
+						ev.Time = time.Now().Unix()
+
+						decoder := json.NewDecoder(bytes.NewReader(buf))
+						err := decoder.Decode(&ev)
+						if err != nil {
+							log.Error("Can't run driver %s on custom module %s: %s - DRIVER DISABLED", drv.Id, drv.Module, err)
+							<-doneChan
+							break
+						} else {
+							ev.Service = strings.Replace(drv.Service, "%tag", ev.Service, -1)
+							queue <- &ev
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func RunBuiltin(pdrv *Driver, pdoneChan *chan bool, pqueue *ResQueue) {
+	drv := *pdrv
+	doneChan := *pdoneChan
+	queue := *pqueue
+
 	paramsMap, err := GetParameters(drv)
 	if err != "" {
 		log.Error("Can't run driver %s: %s - DRIVER DISABLED", drv.Id, err)

@@ -11,7 +11,7 @@ import (
 )
 
 var HttpModule = Module{
-	"http",
+	"http", "builtin",
 	[]ModuleParameter{
 		ModuleParameter{"url", "string", true, nil},
 		ModuleParameter{"method", "string", false, "GET"},
@@ -19,7 +19,7 @@ var HttpModule = Module{
 		ModuleParameter{"body", "string", false, nil},
 		ModuleParameter{"timeout", "number", false, 10},
 		ModuleParameter{"include_response", "bool", false, false}},
-	ModuleCallable(HttpModuleImpl)}
+	ModuleCallable(HttpModuleImpl), ""}
 
 func HttpModuleImpl(input ModuleParamList) EventList {
 	var reader *strings.Reader
