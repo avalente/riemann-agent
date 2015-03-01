@@ -39,6 +39,35 @@ func StartDrivers(drivers []*Driver, queue ResQueue) {
 	}
 }
 
+func ValidateType(name string, expType string, value interface{}) *string {
+	var vtype string
+
+	if value == nil {
+		return nil
+	}
+
+	switch t := value.(type) {
+	case bool:
+		vtype = "bool"
+	case int, int64, float64, float32:
+		vtype = "number"
+	case string:
+		vtype = "string"
+	case map[string]interface{}:
+		vtype = "map"
+	default:
+		res := fmt.Sprintf("%s (unsupported type %T)", name, t)
+		return &res
+	}
+
+	if vtype != expType {
+		res := fmt.Sprintf("%s (%s not %s)", name, vtype, expType)
+		return &res
+	}
+
+	return nil
+}
+
 func GetParameters(drv Driver) (modules.ModuleParamList, string) {
 	params := make(modules.ModuleParamList)
 	notFound := make([]string, 0)
@@ -47,29 +76,19 @@ func GetParameters(drv Driver) (modules.ModuleParamList, string) {
 	for _, param := range drv.ModuleObject.Parameters {
 		value, found := drv.Configuration[param.Name]
 		if !found {
-			notFound = append(notFound, param.Name)
-		} else {
-			var vtype string
-
-			switch t := value.(type) {
-			case bool:
-				vtype = "bool"
-			case float64:
-				vtype = "float"
-			case int, int64:
-				vtype = "int"
-			case string:
-				vtype = "string"
-			default:
-				typeErrors = append(typeErrors, fmt.Sprintf("%s (unsupported type %t)", param.Name, t))
+			if param.Required {
+				notFound = append(notFound, param.Name)
 				continue
-			}
-
-			if vtype != param.Type {
-				typeErrors = append(typeErrors, fmt.Sprintf("%s (not %s)", param.Name, param.Type))
 			} else {
-				params[param.Name] = value
+				value = param.Default
 			}
+		}
+
+		validationError := ValidateType(param.Name, param.Type, value)
+		if validationError == nil {
+			params[param.Name] = value
+		} else {
+			typeErrors = append(typeErrors, *validationError)
 		}
 	}
 
@@ -107,12 +126,15 @@ func RunDriver(drv Driver, doneChan chan bool, queue ResQueue) {
 		for !exit {
 			select {
 			case <-ticker.C:
-				ev := drv.ModuleObject.Callable(paramsMap)
-				ev.Service = drv.Service
-				ev.Host = drv.Host
-				ev.Tags = drv.Tags
-				ev.Ttl = drv.Ttl
-				queue <- ev
+				for _, ev := range drv.ModuleObject.Callable(paramsMap) {
+					ev.Description = drv.Description
+					ev.Service = strings.Replace(drv.Service, "%tag", ev.Service, -1)
+					ev.Host = drv.Host
+					ev.Tags = drv.Tags
+					ev.Ttl = drv.Ttl
+					ev.Time = time.Now().Unix()
+					queue <- ev
+				}
 			case <-doneChan:
 				log.Debug("Terminating driver %v", drv.Id)
 				ticker.Stop()

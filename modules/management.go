@@ -8,12 +8,14 @@ import (
 )
 
 type ModuleParameter struct {
-	Name string
-	Type string
+	Name     string
+	Type     string
+	Required bool
+	Default  interface{}
 }
 
 type ModuleParamList map[string]interface{}
-type ModuleCallable func(ModuleParamList) *raidman.Event
+type ModuleCallable func(ModuleParamList) EventList
 
 type Module struct {
 	Name       string
@@ -21,13 +23,27 @@ type Module struct {
 	Callable   ModuleCallable
 }
 
+type EventList []*raidman.Event
+
+func NewEventList(events ...*raidman.Event) EventList {
+	return events
+}
+
 func GetBuiltinModules() []Module {
 	pingModule := Module{
 		"ping",
-		[]ModuleParameter{ModuleParameter{"target", "string"}},
+		[]ModuleParameter{ModuleParameter{"target", "string", true, nil}},
 		ModuleCallable(PingModuleImpl)}
 
-	return []Module{pingModule}
+	fakeModule := Module{
+		"fake",
+		[]ModuleParameter{
+			ModuleParameter{"attribute", "string", true, nil},
+			ModuleParameter{"value1", "number", true, nil},
+			ModuleParameter{"value2", "number", false, 42}},
+		ModuleCallable(FakeModuleImpl)}
+
+	return []Module{pingModule, fakeModule, HttpModule}
 }
 
 func ScanModules(modulesDir string) map[string]Module {
@@ -44,10 +60,10 @@ func ScanModules(modulesDir string) map[string]Module {
 	return res
 }
 
-func PingModuleImpl(input ModuleParamList) *raidman.Event {
+func PingModuleImpl(input ModuleParamList) EventList {
 	target := input["target"].(string)
 
-	event := raidman.Event{Service: "agent"}
+	event := raidman.Event{}
 
 	startedOn := time.Now()
 	_, err := net.DialTimeout("ip", target, time.Second)
@@ -62,5 +78,21 @@ func PingModuleImpl(input ModuleParamList) *raidman.Event {
 		event.Attributes = map[string]string{"error": err.Error()}
 	}
 
-	return &event
+	return NewEventList(&event)
+}
+
+func FakeModuleImpl(input ModuleParamList) EventList {
+	ev1 := raidman.Event{}
+	ev1.Attributes = map[string]string{"test": input["attribute"].(string)}
+	ev1.State = "ok"
+	ev1.Metric = input["value1"]
+	ev1.Service = "value1"
+
+	ev2 := raidman.Event{}
+	ev2.Attributes = map[string]string{"test": input["attribute"].(string)}
+	ev2.State = "ok"
+	ev2.Metric = input["value2"]
+	ev2.Service = "value2"
+
+	return NewEventList(&ev1, &ev2)
 }
