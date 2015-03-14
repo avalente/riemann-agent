@@ -2,5 +2,7 @@
   "riemannprotocol": "tcp",
   "logfile": "agent.log",
   "loglevel": "info",
-  "pidfile": "agent.pid"
+  "pidfile": "agent.pid",
+  "driversdirectory": "./drivers",
+  "modulesdirectory": "./custom-modules"
 }

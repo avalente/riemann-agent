@@ -141,8 +141,6 @@ func RunExecutable(pdrv *Driver, pdoneChan *chan bool, pqueue *ResQueue) {
 
 		ticker := time.NewTicker(duration)
 
-		exit := false
-
 		// start external process
 		cmd := exec.Command(drv.ModuleObject.Executable)
 		stdin, err_stdin := cmd.StdinPipe()
@@ -164,14 +162,15 @@ func RunExecutable(pdrv *Driver, pdoneChan *chan bool, pqueue *ResQueue) {
 			<-doneChan
 		} else {
 
-			for !exit {
+		loop:
+			for true {
 				select {
 				case <-doneChan:
 					log.Debug("Terminating driver %v", drv.Id)
 					ticker.Stop()
 					stdin.Write([]byte("exit"))
 					cmd.Wait()
-					exit = true
+					break loop
 				case <-ticker.C:
 					//TODO: check errors
 					in_ := append([]byte("call "), paramsJson...)
@@ -229,9 +228,8 @@ func RunBuiltin(pdrv *Driver, pdoneChan *chan bool, pqueue *ResQueue) {
 
 		ticker := time.NewTicker(duration)
 
-		exit := false
-
-		for !exit {
+	loop:
+		for true {
 			select {
 			case <-ticker.C:
 				for _, ev := range drv.ModuleObject.Callable(paramsMap) {
@@ -246,7 +244,7 @@ func RunBuiltin(pdrv *Driver, pdoneChan *chan bool, pqueue *ResQueue) {
 			case <-doneChan:
 				log.Debug("Terminating driver %v", drv.Id)
 				ticker.Stop()
-				exit = true
+				break loop
 			}
 		}
 	}

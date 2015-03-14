@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Configuration struct {
@@ -19,6 +20,15 @@ type Configuration struct {
 
 func NewConfiguration() *Configuration {
 	return &Configuration{"custom-modules", "drivers", "localhost:5555", "udp", "-", "info", ""}
+}
+
+func normalizePath(configFile string, fileName string) string {
+	if strings.HasPrefix(fileName, "./") {
+		cfgDir := filepath.Dir(configFile)
+		fileName = filepath.Join(cfgDir, fileName[2:])
+	}
+	fileName, _ = filepath.Abs(fileName)
+	return fileName
 }
 
 func GetConfiguration(fileName string) (*Configuration, error) {
@@ -42,10 +52,10 @@ func GetConfiguration(fileName string) (*Configuration, error) {
 		return nil, errors.New("Empty drivers directory")
 	}
 
-	cfg.DriversDirectory, _ = filepath.Abs(cfg.DriversDirectory)
+	cfg.DriversDirectory = normalizePath(fileName, cfg.DriversDirectory)
 
 	if cfg.ModulesDirectory != "" {
-		cfg.ModulesDirectory, _ = filepath.Abs(cfg.ModulesDirectory)
+		cfg.ModulesDirectory = normalizePath(fileName, cfg.ModulesDirectory)
 	}
 
 	return cfg, nil

@@ -122,8 +122,9 @@ func main() {
 	// Wait for signal
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, os.Kill, syscall.SIGHUP, syscall.SIGTERM)
-	exit := false
-	for !exit {
+
+loop:
+	for true {
 		start(&state)
 
 		log.Info("Instance %v started.", os.Getpid())
@@ -133,7 +134,7 @@ func main() {
 		sig := <-sigc
 		switch sig {
 		case os.Interrupt, os.Kill, syscall.SIGTERM:
-			exit = true
+			break loop
 		case syscall.SIGHUP:
 			log.Notice("Reloading...")
 			StopAll(&state)
@@ -200,7 +201,7 @@ func start(state *AppState) {
 }
 
 func riemannConnect(cfg *Configuration, done *chan bool) *raidman.Client {
-	for i := 0; i <= 10; i++ {
+	for i := 0; i < 10; i++ {
 		conn, err := raidman.Dial(cfg.RiemannProtocol, cfg.RiemannHost)
 
 		if err == nil {
@@ -223,23 +224,22 @@ func riemannConnect(cfg *Configuration, done *chan bool) *raidman.Client {
 }
 
 func riemannSender(cfg *Configuration, channel *ResQueue, done *chan bool) {
-	exit := false
-
 	conn := riemannConnect(cfg, done)
 	if conn != nil {
 		defer conn.Close()
 	} else {
-		exit = true
+		return
 	}
 
-	for !exit {
+loop:
+	for true {
 		select {
 		case <-*done:
 			log.Debug("Terminating sender")
-			exit = true
+			break loop
 		case message := <-*channel:
 			if message == nil {
-				exit = true
+				break loop
 			}
 			err := conn.Send(message)
 			if err != nil {

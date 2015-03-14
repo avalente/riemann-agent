@@ -11,6 +11,7 @@ import (
 
 type Ctx struct {
 	dir string
+	cwd string
 }
 
 var ctx Ctx
@@ -38,7 +39,12 @@ func setUp() Ctx {
 		panic(err)
 	}
 
-	return Ctx{dir: tmpdir}
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	return Ctx{dir: tmpdir, cwd: cwd}
 
 }
 
@@ -80,6 +86,21 @@ func TestNewConfiguration(m *testing.T) {
 	AssertEqual(m, nc.RiemannHost, "localhost:5555")
 	AssertEqual(m, nc.RiemannProtocol, "udp")
 	AssertEqual(m, nc.PidFile, "")
+}
+
+func TestNormalizePathPlain(m *testing.T) {
+	value := normalizePath("/etc/riemann-agent/cfg", "drivers")
+	AssertEqual(m, value, filepath.Join(ctx.cwd, "drivers"))
+}
+
+func TestNormalizePathAbsolute(m *testing.T) {
+	value := normalizePath("/etc/riemann-agent/cfg", "/etc/ra/drivers")
+	AssertEqual(m, value, "/etc/ra/drivers")
+}
+
+func TestNormalizePathRelative(m *testing.T) {
+	value := normalizePath("/etc/riemann-agent/cfg", "./drivers")
+	AssertEqual(m, value, "/etc/riemann-agent/drivers")
 }
 
 func TestGetConfigurationNotFound(m *testing.T) {
@@ -133,5 +154,22 @@ func TestGetConfigurationDefaults(m *testing.T) {
 	if cfg == nil {
 		m.Errorf("No configuration found")
 	}
+}
+
+func TestGetConfigurationRelativePaths(m *testing.T) {
+	file := createCF(ctx, "{\"modulesdirectory\": \"./mod\", \"driversdirectory\": \"./drv\"}")
+
+	cfg, err := GetConfiguration(file)
+
+	if err != nil {
+		m.Errorf("No errors expected, found %s", err.Error())
+	}
+
+	if cfg == nil {
+		m.Errorf("No configuration found")
+	}
+
+	AssertEqual(m, cfg.DriversDirectory, filepath.Join(ctx.dir, "drv"))
+	AssertEqual(m, cfg.ModulesDirectory, filepath.Join(ctx.dir, "mod"))
 
 }
