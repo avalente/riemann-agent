@@ -161,7 +161,7 @@ func StopAll(state *AppState) {
 
 func start(state *AppState) {
 	// Read configuration from file
-	cfg, err := getConfiguration(state.cmdLine.configFile)
+	cfg, err := GetConfiguration(state.cmdLine.configFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Can't read configuration file: %v\n", err)
 		os.Exit(1)

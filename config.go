@@ -21,7 +21,7 @@ func NewConfiguration() *Configuration {
 	return &Configuration{"custom-modules", "drivers", "localhost:5555", "udp", "-", "info", ""}
 }
 
-func getConfiguration(fileName string) (*Configuration, error) {
+func GetConfiguration(fileName string) (*Configuration, error) {
 	file, err := os.Open(fileName)
 	defer file.Close()
 	if err != nil {
@@ -40,18 +40,12 @@ func getConfiguration(fileName string) (*Configuration, error) {
 
 	if cfg.DriversDirectory == "" {
 		return nil, errors.New("Empty drivers directory")
-	} else {
-		cfg.DriversDirectory, err = filepath.Abs(cfg.DriversDirectory)
-		if err != nil {
-			return nil, errors.New("Can't get absolute path for drivers directory")
-		}
 	}
 
+	cfg.DriversDirectory, _ = filepath.Abs(cfg.DriversDirectory)
+
 	if cfg.ModulesDirectory != "" {
-		cfg.ModulesDirectory, err = filepath.Abs(cfg.ModulesDirectory)
-		if err != nil {
-			return nil, errors.New("Can't get absolute path for modules directory")
-		}
+		cfg.ModulesDirectory, _ = filepath.Abs(cfg.ModulesDirectory)
 	}
 
 	return cfg, nil
