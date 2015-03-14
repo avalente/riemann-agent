@@ -1,1 +1,3 @@
 riemann-agent
+*.log
+coverage.out
