@@ -6,9 +6,16 @@ The "loop" function implements the protocol between riemann-agent
 and the custom module, while "fun" generates the events
 """
 
-import struct
 import sys
 import json
+
+def format_number(num):
+    # by specs - numbers must be encoded with their decimal
+    # representation, exactly 4 digits
+    if num > 9999:
+        raise RuntimeError("Value too big")
+    return "%04d" % num
+
 
 def loop(fun):
     while True:
@@ -18,15 +25,17 @@ def loop(fun):
         if msg.startswith("call "):
             in_ = json.loads(msg[5:])
             data = fun(in_)
-            count = struct.pack("<I", len(data))
+
+            sys.stdout.write(format_number(len(data)))
             for item in data:
                 out = json.dumps(item)
-                size = struct.pack("<I", len(out))
-                sys.stdout.write("%s%s%s" % (count, size, out))
+                size = format_number(len(out))
+                sys.stdout.write("%s%s" % (size, out))
             sys.stdout.flush()
 
 def fun(in_):
-    return [dict(metric=4.2, attributes={"input": str(in_)}, service="from python")]
+    return [dict(metric=4.2, attributes={"input": str(in_)}, service="from python"),
+            dict(metric=0, attribtes={"message": "second event"}, service="from python - 2")]
 
 if __name__ == "__main__":
     loop(fun)

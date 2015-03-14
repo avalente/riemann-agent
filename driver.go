@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -125,6 +126,17 @@ func RunDriver(drv Driver, doneChan chan bool, queue ResQueue) {
 	}
 }
 
+func readInt(reader io.Reader) int64 {
+	// string representation of four-digit integer (0001-9999)
+	//TODO:: check errors
+	countBuf := make([]byte, 4)
+	n, _ := reader.Read(countBuf)
+	if n != 4 {
+	}
+	count, _ := strconv.ParseInt(string(countBuf), 10, 0)
+	return count
+}
+
 func RunExecutable(pdrv *Driver, pdoneChan *chan bool, pqueue *ResQueue) {
 	drv := *pdrv
 	doneChan := *pdoneChan
@@ -177,17 +189,14 @@ func RunExecutable(pdrv *Driver, pdoneChan *chan bool, pqueue *ResQueue) {
 					in_ = append(in_, '\n')
 					stdin.Write(in_)
 
-					// events count
-					var count int32
-					binary.Read(stdout, binary.LittleEndian, &count)
+					count := readInt(stdout)
 
 					for i := 0; i < int(count); i++ {
-						var size int32
-						binary.Read(stdout, binary.LittleEndian, &size)
+						size := readInt(stdout)
 						buf := make([]byte, size)
 						n, _ := stdout.Read(buf)
 						if n != int(size) {
-							//TODO: check n
+							//TODO: check n and errors
 						}
 
 						ev := raidman.Event{}
@@ -281,7 +290,7 @@ func GetDrivers(availableModules map[string]modules.Module, directory string) []
 				defer file.Close()
 
 				decoder := json.NewDecoder(file)
-				drv := Driver{Interval: 30}
+				drv := Driver{Interval: 30, Ttl: 60}
 				err = decoder.Decode(&drv)
 				if err != nil {
 					doLog(err)
