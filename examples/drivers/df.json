@@ -1,0 +1,8 @@
+{
+  "description": "Disk free driver",
+  "module": "disk",
+  "interval": 20,
+  "service": "disk free %tag",
+  "configuration": {
+  }
+}

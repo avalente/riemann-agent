@@ -1,0 +1,50 @@
+#!/bin/bash
+
+OS=$(uname | tr '[:upper:]' '[:lower:]')
+
+if [[ $OS != "darwin" ]]; then
+    echo "Unsupported os: $OS"
+    exit 1
+fi
+
+while read line
+do
+    if [[ $line == "" ]] || [[ $line == "exit" ]]; then
+        break
+    fi
+
+    if [[ $line == "call "* ]]; then
+        # parameters ignored by now
+
+        df_out=$(df -lkP | tail -n +2)
+        cnt=$(echo "$df_out" | wc -l)
+
+        if [ $cnt -gt 9999 ]; then
+            echo "Too many events"
+            exit 2
+        fi
+
+        # print events count
+        printf "%04d" $cnt
+
+        echo "$df_out" | while read -r name bl used available capacity mount; do
+            value=$(cat <<EOF
+{"metric": $((available*1024)), "attributes": {"capacity": "$capacity", "used": "$((used*1024))", "name": "$name", "mountpoint": "$mount"}, "service": "$mount"}
+EOF
+)
+            size=${#value}
+            size=$((size+1))
+
+            if [ $size -gt 9999 ]; then
+                echo "Event too big"
+                exit 2
+            fi
+
+            printf "%04d" $size
+            echo $value
+
+        done
+
+    fi
+done
+
